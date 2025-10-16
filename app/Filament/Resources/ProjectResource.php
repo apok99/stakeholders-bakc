@@ -187,7 +187,13 @@ class ProjectResource extends Resource
                                 ->form([
                                     Forms\Components\FileUpload::make('brandwatch_file')
                                         ->label('Reporte Brandwatch')
-                                        ->acceptedFileTypes(['text/csv', 'text/plain'])
+                                        ->acceptedFileTypes([
+                                            'text/csv',
+                                            'text/plain',
+                                            'application/csv',
+                                            'application/vnd.ms-excel',
+                                            'application/octet-stream',
+                                        ])
                                         ->required()
                                         ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
                                         ->dehydrated(false)
@@ -345,7 +351,13 @@ class ProjectResource extends Resource
                     ->form([
                         Forms\Components\FileUpload::make('csv_file')
                             ->label('Archivo CSV')
-                            ->acceptedFileTypes(['text/csv', 'text/plain', 'application/vnd.ms-excel'])
+                            ->acceptedFileTypes([
+                                'text/csv',
+                                'text/plain',
+                                'application/csv',
+                                'application/vnd.ms-excel',
+                                'application/octet-stream',
+                            ])
                             ->required()
                             ->helperText('Selecciona un archivo .csv con los datos de stakeholders o respuestas preparadas.')
                             ->dehydrated(false)
