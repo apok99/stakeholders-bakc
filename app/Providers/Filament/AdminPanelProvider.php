@@ -41,6 +41,7 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
