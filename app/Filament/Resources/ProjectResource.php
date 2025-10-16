@@ -167,7 +167,7 @@ class ProjectResource extends Resource
                                     ->visible(fn (callable $get) => filled($get('form_definition_id')))
                                     ->columnSpan(6)
                                     ->extraAttributes([
-                                        'class' => 'flex items-end justify-end gap-3',
+                                        'class' => 'flex items-center justify-center gap-3 py-6',
                                     ]),
                                 Forms\Components\ViewField::make('form_responses_preview')
                                     ->label('Respuestas guardadas')
@@ -220,6 +220,17 @@ class ProjectResource extends Resource
                             ->required()
                             ->helperText('Separa los actores con comas para facilitar la lectura.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->afterStateHydrated(function (Forms\Components\TagsInput $component, $state): void {
+                                if (is_string($state)) {
+                                    $component->state(
+                                        collect(preg_split('/\s*,\s*/', $state, -1, PREG_SPLIT_NO_EMPTY))
+                                            ->filter()
+                                            ->values()
+                                            ->all()
+                                    );
+                                }
+                            })
+                            ->dehydrateStateUsing(fn ($state) => collect($state)->filter()->implode(', '))
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('next_milestones')
                             ->label('Próximos hitos')
