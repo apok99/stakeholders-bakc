@@ -17,6 +17,13 @@ class EditProject extends EditRecord
         ];
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $data = parent::mutateFormDataBeforeFill($data);
+
+        return ProjectResource::prepareFormDataForFill($data);
+    }
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $data = parent::mutateFormDataBeforeSave($data);

@@ -10,10 +10,13 @@ use Filament\Forms\Components\Actions as FormActions;
 use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Notifications\Notification;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
+use Filament\Forms\Set;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Arr;
 
 class ProjectResource extends Resource
 {
@@ -27,7 +30,7 @@ class ProjectResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $fieldAccentClasses = 'focus:border-blue-500 focus:ring-blue-500/80';
+        $fieldAccentClasses = static::fieldAccentClasses();
 
         $supportsFormDefinitions = static::supportsFormDefinitions();
 
@@ -231,6 +234,8 @@ class ProjectResource extends Resource
 
     protected static function getFormDefinitionSchema(): array
     {
+        $fieldAccentClasses = static::fieldAccentClasses();
+
         return [
             Forms\Components\Select::make('form_definition_id')
                 ->label('Categoría')
@@ -238,86 +243,31 @@ class ProjectResource extends Resource
                 ->searchable()
                 ->placeholder('Selecciona una categoría')
                 ->reactive()
-                ->afterStateUpdated(function ($state, callable $set, Forms\Components\Component $component): void {
-                    $set('form_responses', []);
-
-                    if (filled($state)) {
-                        $component->getLivewire()->mountFormComponentAction($component->getStatePath(), 'fillFormDefinition');
+                ->afterStateUpdated(function ($state, Set $set, Get $get): void {
+                    $set('form_responses', static::initializeFormResponseState($state, $get('form_responses')));
+                })
+                ->afterStateHydrated(function ($state, ?string $operation, Set $set, Get $get): void {
+                    if (! filled($state)) {
+                        return;
                     }
+
+                    $set('form_responses', static::initializeFormResponseState($state, $get('form_responses')));
                 })
                 ->helperText('Las categorías se gestionan desde la pestaña “Form Definitions”.')
                 ->columnSpan(6),
             Forms\Components\Hidden::make('form_responses')
                 ->default([])
                 ->dehydrated()
-                ->afterStateHydrated(fn (Forms\Components\Hidden $component, $state) => $component->state($state ?? [])),
+                ->afterStateHydrated(fn (Forms\Components\Hidden $component, $state) => $component->state(static::extractResponseAnswers($state))),
+            Forms\Components\Fieldset::make('form_definition_questions')
+                ->label('Preguntas de la categoría')
+                ->visible(fn (Get $get) => filled($get('form_definition_id')))
+                ->schema(fn (Get $get) => static::buildQuestionComponents($get('form_definition_id'), $fieldAccentClasses))
+                ->columns(12)
+                ->extraAttributes([
+                    'class' => 'space-y-4 rounded-2xl border border-blue-500/20 bg-white/70 p-4 shadow-inner backdrop-blur-sm dark:border-blue-500/10 dark:bg-gray-900/60',
+                ]),
             FormActions::make([
-                FormAction::make('fillFormDefinition')
-                    ->label('Responder preguntas ahora')
-                    ->icon('heroicon-o-pencil-square')
-                    ->color('primary')
-                    ->modalHeading(fn (callable $get) => optional(FormDefinition::find($get('form_definition_id')))->name ?? 'Responder formulario')
-                    ->modalSubmitActionLabel('Guardar respuestas')
-                    ->modalWidth('screen-xl')
-                    ->modalAlignment('top')
-                    ->visible(fn (callable $get) => filled($get('form_definition_id')))
-                    ->form(function (callable $get): array {
-                        $formDefinition = FormDefinition::find($get('form_definition_id'));
-
-                        if (! $formDefinition) {
-                            return [];
-                        }
-
-                        return collect($formDefinition->fields ?? [])
-                            ->map(function ($field, $index) {
-                                $component = match ($field['type'] ?? 'text') {
-                                    'select' => Forms\Components\Select::make("responses.{$index}")
-                                        ->options(collect($field['options'] ?? [])->mapWithKeys(fn ($option) => [$option => $option])->all()),
-                                    'checkbox' => Forms\Components\Checkbox::make("responses.{$index}"),
-                                    'radio' => Forms\Components\Radio::make("responses.{$index}")
-                                        ->options(collect($field['options'] ?? [])->mapWithKeys(fn ($option) => [$option => $option])->all()),
-                                    'textarea' => Forms\Components\Textarea::make("responses.{$index}"),
-                                    default => Forms\Components\TextInput::make("responses.{$index}"),
-                                };
-
-                                return $component
-                                    ->label($field['label'] ?? 'Pregunta '.($index + 1))
-                                    ->columnSpanFull();
-                            })
-                            ->values()
-                            ->all();
-                    })
-                    ->fillForm(function (callable $get): array {
-                        $responses = collect($get('form_responses') ?? []);
-
-                        if ($responses->isEmpty()) {
-                            return [];
-                        }
-
-                        return [
-                            'responses' => $responses->pluck('answer')->toArray(),
-                        ];
-                    })
-                    ->action(function (array $data, callable $set, callable $get): void {
-                        $formDefinition = FormDefinition::find($get('form_definition_id'));
-
-                        if (! $formDefinition) {
-                            return;
-                        }
-
-                        $responses = collect($formDefinition->fields ?? [])
-                            ->map(function ($field, $index) use ($data) {
-                                $answers = $data['responses'] ?? [];
-
-                                return [
-                                    'question' => $field['label'] ?? 'Pregunta '.($index + 1),
-                                    'answer' => $answers[$index] ?? null,
-                                ];
-                            })
-                            ->toArray();
-
-                        $set('form_responses', $responses);
-                    }),
                 FormAction::make('uploadCsv')
                     ->label('Subir CSV')
                     ->icon('heroicon-o-arrow-up-tray')
@@ -358,7 +308,7 @@ class ProjectResource extends Resource
                             ->success()
                             ->send();
                     })
-                    ->visible(fn (callable $get) => filled($get('form_definition_id'))),
+                    ->visible(fn (Get $get) => filled($get('form_definition_id'))),
                 FormAction::make('generateSampleData')
                     ->label('Generar automáticamente')
                     ->icon('heroicon-o-sparkles')
@@ -374,29 +324,13 @@ class ProjectResource extends Resource
                                 ->send();
                         }
                     })
-                    ->visible(fn (callable $get, $livewire) => $livewire instanceof Pages\CreateProject && filled($get('form_definition_id')))
+                    ->visible(fn (Get $get, $livewire) => $livewire instanceof Pages\CreateProject && filled($get('form_definition_id')))
                     ->requiresConfirmation(false),
             ])
-                ->visible(fn (callable $get) => filled($get('form_definition_id')))
+                ->visible(fn (Get $get) => filled($get('form_definition_id')))
                 ->columnSpan(6)
                 ->extraAttributes([
                     'class' => 'flex flex-col items-center justify-center gap-3 py-6',
-                ]),
-            Forms\Components\ViewField::make('form_responses_preview')
-                ->label('Respuestas guardadas')
-                ->view('filament.forms.components.form-responses-preview')
-                ->visible(fn (callable $get) => filled($get('form_responses')))
-                ->viewData(function (callable $get): array {
-                    $formDefinition = FormDefinition::find($get('form_definition_id'));
-
-                    return [
-                        'formName' => $formDefinition?->name,
-                        'responses' => $get('form_responses') ?? [],
-                    ];
-                })
-                ->columnSpanFull()
-                ->extraAttributes([
-                    'class' => 'mt-4 rounded-2xl border border-blue-500/20 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-blue-500/10 dark:bg-gray-900/60',
                 ]),
             Forms\Components\Section::make('Brandwatch')
                 ->description('Sincroniza insights de escucha social importando reportes directamente desde Brandwatch.')
@@ -466,8 +400,174 @@ class ProjectResource extends Resource
     {
         if (! static::supportsFormDefinitions()) {
             unset($data['form_definition_id'], $data['form_responses']);
+
+            return $data;
+        }
+
+        if (blank($data['form_definition_id'] ?? null)) {
+            $data['form_definition_id'] = null;
+            $data['form_responses'] = [];
+
+            return $data;
+        }
+
+        $formDefinition = FormDefinition::find($data['form_definition_id']);
+
+        if (! $formDefinition) {
+            $data['form_responses'] = [];
+
+            return $data;
+        }
+
+        $answers = static::extractResponseAnswers($data['form_responses'] ?? []);
+
+        $data['form_responses'] = collect($formDefinition->fields ?? [])
+            ->values()
+            ->map(function ($field, $index) use ($answers) {
+                return [
+                    'question' => $field['label'] ?? 'Pregunta '.($index + 1),
+                    'answer' => $answers[$index] ?? null,
+                ];
+            })
+            ->toArray();
+
+        return $data;
+    }
+
+    public static function prepareFormDataForFill(array $data): array
+    {
+        if (! static::supportsFormDefinitions()) {
+            return $data;
+        }
+
+        if (isset($data['form_responses'])) {
+            $data['form_responses'] = static::extractResponseAnswers($data['form_responses']);
         }
 
         return $data;
+    }
+
+    protected static function extractResponseAnswers($responses): array
+    {
+        return collect($responses ?? [])
+            ->map(function ($value) {
+                if (is_array($value)) {
+                    return $value['answer'] ?? null;
+                }
+
+                return $value;
+            })
+            ->values()
+            ->toArray();
+    }
+
+    protected static function initializeFormResponseState($formDefinitionId, $currentResponses): array
+    {
+        if (! $formDefinitionId) {
+            return [];
+        }
+
+        $formDefinition = FormDefinition::find($formDefinitionId);
+
+        if (! $formDefinition) {
+            return [];
+        }
+
+        $answers = static::extractResponseAnswers($currentResponses);
+
+        return collect($formDefinition->fields ?? [])
+            ->values()
+            ->map(fn ($field, $index) => $answers[$index] ?? null)
+            ->toArray();
+    }
+
+    protected static function buildQuestionComponents($formDefinitionId, string $fieldAccentClasses): array
+    {
+        if (! $formDefinitionId) {
+            return [];
+        }
+
+        $formDefinition = FormDefinition::find($formDefinitionId);
+
+        if (! $formDefinition) {
+            return [];
+        }
+
+        $fields = collect($formDefinition->fields ?? [])->values();
+
+        if ($fields->isEmpty()) {
+            return [
+                Forms\Components\Placeholder::make('no_form_questions')
+                    ->content('Esta categoría aún no tiene preguntas configuradas.')
+                    ->columnSpanFull()
+                    ->extraAttributes([
+                        'class' => 'text-sm text-gray-600 dark:text-gray-300',
+                    ]),
+            ];
+        }
+
+        return $fields
+            ->map(function ($field, $index) use ($fieldAccentClasses) {
+                $statePath = "form_responses.{$index}";
+                $label = $field['label'] ?? 'Pregunta '.($index + 1);
+                $helper = $field['description'] ?? null;
+                $placeholder = $field['placeholder'] ?? null;
+                $required = (bool) ($field['required'] ?? false);
+                $options = collect($field['options'] ?? [])
+                    ->mapWithKeys(function ($option, $key) {
+                        if (is_array($option)) {
+                            $value = Arr::get($option, 'value', is_int($key) ? ($option['label'] ?? $key) : $key);
+                            $label = Arr::get($option, 'label', $value);
+
+                            return [$value => $label];
+                        }
+
+                        return [is_int($key) ? $option : $key => $option];
+                    })
+                    ->all();
+
+                return match ($field['type'] ?? 'text') {
+                    'select' => Forms\Components\Select::make($statePath)
+                        ->label($label)
+                        ->options($options)
+                        ->placeholder($placeholder ?? 'Selecciona una opción')
+                        ->helperText($helper)
+                        ->required($required)
+                        ->searchable()
+                        ->columnSpanFull(),
+                    'checkbox' => Forms\Components\Checkbox::make($statePath)
+                        ->label($label)
+                        ->helperText($helper)
+                        ->required($required)
+                        ->columnSpanFull(),
+                    'radio' => Forms\Components\Radio::make($statePath)
+                        ->label($label)
+                        ->options($options)
+                        ->helperText($helper)
+                        ->required($required)
+                        ->columnSpanFull(),
+                    'textarea' => Forms\Components\Textarea::make($statePath)
+                        ->label($label)
+                        ->placeholder($placeholder)
+                        ->helperText($helper)
+                        ->required($required)
+                        ->autosize()
+                        ->extraAttributes(['class' => $fieldAccentClasses])
+                        ->columnSpanFull(),
+                    default => Forms\Components\TextInput::make($statePath)
+                        ->label($label)
+                        ->placeholder($placeholder)
+                        ->helperText($helper)
+                        ->required($required)
+                        ->extraInputAttributes(['class' => $fieldAccentClasses])
+                        ->columnSpanFull(),
+                };
+            })
+            ->all();
+    }
+
+    protected static function fieldAccentClasses(): string
+    {
+        return 'focus:border-blue-500 focus:ring-blue-500/80';
     }
 }

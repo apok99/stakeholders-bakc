@@ -22,6 +22,13 @@ class CreateProject extends CreateRecord
         ];
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        $data = parent::mutateFormDataBeforeFill($data);
+
+        return ProjectResource::prepareFormDataForFill($data);
+    }
+
     public function fillFakeData(): void
     {
         $faker = fake();
