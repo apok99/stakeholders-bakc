@@ -359,47 +359,6 @@ class ProjectResource extends Resource
                             ->send();
                     })
                     ->visible(fn (callable $get) => filled($get('form_definition_id'))),
-                FormAction::make('uploadBrandwatch')
-                    ->label('Subir Brandwatch')
-                    ->icon('heroicon-o-cloud-arrow-up')
-                    ->color('info')
-                    ->modalIcon('heroicon-o-cloud-arrow-up')
-                    ->modalHeading('Conectar reporte de Brandwatch')
-                    ->modalDescription('Adjunta el CSV exportado desde Brandwatch para sincronizar menciones y sentimientos.')
-                    ->modalSubmitActionLabel('Subir reporte')
-                    ->form([
-                        Forms\Components\FileUpload::make('brandwatch_file')
-                            ->label('Reporte Brandwatch')
-                            ->acceptedFileTypes(['text/csv', 'text/plain'])
-                            ->required()
-                            ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
-                            ->dehydrated(false)
-                            ->preserveFilenames(),
-                    ])
-                    ->action(function (array $data): void {
-                        $uploaded = $data['brandwatch_file'] ?? null;
-
-                        if (! $uploaded) {
-                            Notification::make()
-                                ->title('No se detectó el reporte de Brandwatch')
-                                ->body('Intenta nuevamente y verifica que el archivo exportado sea .csv.')
-                                ->danger()
-                                ->send();
-
-                            return;
-                        }
-
-                        $fileName = is_string($uploaded)
-                            ? basename($uploaded)
-                            : $uploaded->getClientOriginalName();
-
-                        Notification::make()
-                            ->title('Reporte Brandwatch recibido')
-                            ->body('El archivo “'.$fileName.'” ya está disponible para revisión.')
-                            ->success()
-                            ->send();
-                    })
-                    ->visible(fn (callable $get) => filled($get('form_definition_id'))),
                 FormAction::make('generateSampleData')
                     ->label('Generar automáticamente')
                     ->icon('heroicon-o-sparkles')
@@ -438,6 +397,67 @@ class ProjectResource extends Resource
                 ->columnSpanFull()
                 ->extraAttributes([
                     'class' => 'mt-4 rounded-2xl border border-blue-500/20 bg-white/70 p-4 shadow-sm backdrop-blur dark:border-blue-500/10 dark:bg-gray-900/60',
+                ]),
+            Forms\Components\Section::make('Brandwatch')
+                ->description('Sincroniza insights de escucha social importando reportes directamente desde Brandwatch.')
+                ->schema([
+                    Forms\Components\Placeholder::make('brandwatch_help')
+                        ->label('¿Por qué conectar Brandwatch?')
+                        ->content('Centraliza la conversación digital del proyecto y cruza menciones con los stakeholders identificados.')
+                        ->columnSpanFull()
+                        ->extraAttributes([
+                            'class' => 'text-sm text-gray-600 dark:text-gray-300',
+                        ]),
+                    FormActions::make([
+                        FormAction::make('uploadBrandwatch')
+                            ->label('Subir Brandwatch')
+                            ->icon('heroicon-o-cloud-arrow-up')
+                            ->color('info')
+                            ->modalIcon('heroicon-o-cloud-arrow-up')
+                            ->modalHeading('Conectar reporte de Brandwatch')
+                            ->modalDescription('Adjunta el CSV exportado desde Brandwatch para sincronizar menciones y sentimientos.')
+                            ->modalSubmitActionLabel('Subir reporte')
+                            ->form([
+                                Forms\Components\FileUpload::make('brandwatch_file')
+                                    ->label('Reporte Brandwatch')
+                                    ->acceptedFileTypes(['text/csv', 'text/plain'])
+                                    ->required()
+                                    ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
+                                    ->dehydrated(false)
+                                    ->preserveFilenames(),
+                            ])
+                            ->action(function (array $data): void {
+                                $uploaded = $data['brandwatch_file'] ?? null;
+
+                                if (! $uploaded) {
+                                    Notification::make()
+                                        ->title('No se detectó el reporte de Brandwatch')
+                                        ->body('Intenta nuevamente y verifica que el archivo exportado sea .csv.')
+                                        ->danger()
+                                        ->send();
+
+                                    return;
+                                }
+
+                                $fileName = is_string($uploaded)
+                                    ? basename($uploaded)
+                                    : $uploaded->getClientOriginalName();
+
+                                Notification::make()
+                                    ->title('Reporte Brandwatch recibido')
+                                    ->body('El archivo “'.$fileName.'” ya está disponible para revisión.')
+                                    ->success()
+                                    ->send();
+                            }),
+                    ])
+                        ->columnSpanFull()
+                        ->extraAttributes([
+                            'class' => 'flex flex-col items-center justify-center gap-3 py-6',
+                        ]),
+                ])
+                ->columns(12)
+                ->extraAttributes([
+                    'class' => 'space-y-4 rounded-3xl border border-blue-500/30 bg-white/80 p-6 shadow-xl ring-1 ring-blue-500/20 backdrop-blur-sm dark:border-blue-500/20 dark:bg-gray-900/70',
                 ]),
         ];
     }
