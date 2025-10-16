@@ -44,7 +44,7 @@ class ProjectResource extends Resource
                                         $set('form_responses', []);
 
                                         if (filled($state)) {
-                                            $component->getLivewire()->mountFormComponentAction($component, 'fillFormDefinition');
+                                            $component->getLivewire()->mountFormComponentAction($component->getStatePath(), 'fillFormDefinition');
                                         }
                                     })
                                     ->helperText('Las categorías se gestionan desde la pestaña “Form Definitions”.')
@@ -148,6 +148,13 @@ class ProjectResource extends Resource
                             ->extraAttributes([
                                 'class' => 'space-y-4 rounded-3xl border border-blue-500/30 bg-blue-500/10 p-4 shadow-inner backdrop-blur-sm dark:border-blue-500/20 dark:bg-gray-900/40',
                             ]),
+                        Forms\Components\Textarea::make('brief_project_description')
+                            ->label('Descripción breve')
+                            ->placeholder('Describe el alcance, entregables y resultados esperados en máximo 4 párrafos.')
+                            ->required()
+                            ->autosize()
+                            ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->columnSpanFull(),
                         Forms\Components\TextInput::make('project_context')
                             ->label('Contexto del proyecto')
                             ->placeholder('Transición energética en comunidades rurales')
@@ -191,13 +198,6 @@ class ProjectResource extends Resource
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
                             ->prefixIcon('heroicon-o-rocket-launch')
                             ->columnSpan(4),
-                        Forms\Components\Textarea::make('brief_project_description')
-                            ->label('Descripción breve')
-                            ->placeholder('Describe el alcance, entregables y resultados esperados en máximo 4 párrafos.')
-                            ->required()
-                            ->autosize()
-                            ->extraInputAttributes(['class' => $fieldAccentClasses])
-                            ->columnSpanFull(),
                     ])
                     ->columns(12)
                     ->extraAttributes([
