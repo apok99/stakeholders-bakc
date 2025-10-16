@@ -41,7 +41,23 @@ class AdminPanelProvider extends PanelProvider
                 AccountWidget::class,
                 FilamentInfoWidget::class,
             ])
-            ->viteTheme('resources/css/filament/admin/theme.css')
+            ->renderHook('panels::head.end', fn (): string => <<<'HTML'
+                <style>
+                    .fi-project-category-modal .fi-modal-window,
+                    [data-modal-id="form-component-action::fillFormDefinition"] .fi-modal-window,
+                    [id="form-component-action"] .fi-modal-window {
+                        width: min(70vw, 60rem);
+                    }
+
+                    @media (min-width: 1024px) {
+                        .fi-project-category-modal .fi-modal-window,
+                        [data-modal-id="form-component-action::fillFormDefinition"] .fi-modal-window,
+                        [id="form-component-action"] .fi-modal-window {
+                            margin-top: 3rem;
+                        }
+                    }
+                </style>
+            HTML)
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
