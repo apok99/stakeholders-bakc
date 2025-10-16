@@ -162,6 +162,8 @@ class ProjectResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $supportsFormDefinitions = static::supportsFormDefinitions();
+
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('project_context')
