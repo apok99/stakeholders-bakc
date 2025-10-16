@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProjectResource\Pages;
 use App\Models\FormDefinition;
+use App\Jobs\ProcessProjectCsvUpload;
 use App\Models\Project;
+use App\Models\ProjectCsvUpload;
 use Filament\Forms;
 use Filament\Forms\Components\Actions as FormActions;
 use Filament\Forms\Components\Actions\Action as FormAction;
@@ -16,7 +18,10 @@ use Filament\Forms\Set;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ProjectResource extends Resource
 {
@@ -160,7 +165,68 @@ class ProjectResource extends Resource
                     ->extraAttributes([
                         'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-lg ring-1 ring-blue-500/25 backdrop-blur-sm',
                     ]),
-                
+                Forms\Components\Section::make('Brandwatch')
+                    ->description('Sincroniza insights de escucha social importando reportes directamente desde Brandwatch.')
+                    ->schema([
+                        Forms\Components\Placeholder::make('brandwatch_help')
+                            ->label('¿Por qué conectar Brandwatch?')
+                            ->content('Centraliza la conversación digital del proyecto y cruza menciones con los stakeholders identificados.')
+                            ->columnSpanFull()
+                            ->extraAttributes([
+                                'class' => 'text-sm text-gray-600 dark:text-gray-300',
+                            ]),
+                        FormActions::make([
+                            FormAction::make('uploadBrandwatch')
+                                ->label('Subir Brandwatch')
+                                ->icon('heroicon-o-cloud-arrow-up')
+                                ->color('info')
+                                ->modalIcon('heroicon-o-cloud-arrow-up')
+                                ->modalHeading('Conectar reporte de Brandwatch')
+                                ->modalDescription('Adjunta el CSV exportado desde Brandwatch para sincronizar menciones y sentimientos.')
+                                ->modalSubmitActionLabel('Subir reporte')
+                                ->form([
+                                    Forms\Components\FileUpload::make('brandwatch_file')
+                                        ->label('Reporte Brandwatch')
+                                        ->acceptedFileTypes(['text/csv', 'text/plain'])
+                                        ->required()
+                                        ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
+                                        ->dehydrated(false)
+                                        ->preserveFilenames(),
+                                ])
+                                ->action(function (array $data): void {
+                                    $uploaded = $data['brandwatch_file'] ?? null;
+
+                                    if (! $uploaded) {
+                                        Notification::make()
+                                            ->title('No se detectó el reporte de Brandwatch')
+                                            ->body('Intenta nuevamente y verifica que el archivo exportado sea .csv.')
+                                            ->danger()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $fileName = is_string($uploaded)
+                                        ? basename($uploaded)
+                                        : $uploaded->getClientOriginalName();
+
+                                    Notification::make()
+                                        ->title('Reporte Brandwatch recibido')
+                                        ->body('El archivo “'.$fileName.'” ya está disponible para revisión.')
+                                        ->success()
+                                        ->send();
+                                }),
+                        ])
+                            ->columnSpanFull()
+                            ->extraAttributes([
+                                'class' => 'flex flex-col items-center justify-center gap-3 py-6',
+                            ]),
+                    ])
+                    ->columns(12)
+                    ->extraAttributes([
+                        'class' => 'space-y-4 rounded-3xl border border-blue-500/30 bg-white/80 p-6 shadow-xl ring-1 ring-blue-500/20 backdrop-blur-sm dark:border-blue-500/20 dark:bg-gray-900/70',
+                    ]),
+
             ]);
     }
 
@@ -285,7 +351,7 @@ class ProjectResource extends Resource
                             ->dehydrated(false)
                             ->preserveFilenames(),
                     ])
-                    ->action(function (array $data): void {
+                    ->action(function (array $data, Get $get, $livewire): void {
                         $uploaded = $data['csv_file'] ?? null;
 
                         if (! $uploaded) {
@@ -298,13 +364,28 @@ class ProjectResource extends Resource
                             return;
                         }
 
-                        $fileName = is_string($uploaded)
-                            ? basename($uploaded)
-                            : $uploaded->getClientOriginalName();
+                        $formDefinitionId = $get('form_definition_id');
+                        $projectId = method_exists($livewire, 'getRecord') && $livewire->getRecord()
+                            ? $livewire->getRecord()->getKey()
+                            : null;
+
+                        $csvUpload = static::storeCsvUpload($uploaded, $formDefinitionId, $projectId);
+
+                        if (! $csvUpload) {
+                            Notification::make()
+                                ->title('No fue posible guardar el archivo')
+                                ->body('Revisa los permisos de almacenamiento e inténtalo nuevamente.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        ProcessProjectCsvUpload::dispatch($csvUpload);
 
                         Notification::make()
                             ->title('CSV cargado correctamente')
-                            ->body('El archivo “'.$fileName.'” quedó listo para procesarse.')
+                            ->body('El archivo “'.$csvUpload->original_name.'” quedó registrado y será procesado en breve.')
                             ->success()
                             ->send();
                     })
@@ -332,68 +413,54 @@ class ProjectResource extends Resource
                 ->extraAttributes([
                     'class' => 'flex flex-col items-center justify-center gap-3 py-6',
                 ]),
-            Forms\Components\Section::make('Brandwatch')
-                ->description('Sincroniza insights de escucha social importando reportes directamente desde Brandwatch.')
-                ->schema([
-                    Forms\Components\Placeholder::make('brandwatch_help')
-                        ->label('¿Por qué conectar Brandwatch?')
-                        ->content('Centraliza la conversación digital del proyecto y cruza menciones con los stakeholders identificados.')
-                        ->columnSpanFull()
-                        ->extraAttributes([
-                            'class' => 'text-sm text-gray-600 dark:text-gray-300',
-                        ]),
-                    FormActions::make([
-                        FormAction::make('uploadBrandwatch')
-                            ->label('Subir Brandwatch')
-                            ->icon('heroicon-o-cloud-arrow-up')
-                            ->color('info')
-                            ->modalIcon('heroicon-o-cloud-arrow-up')
-                            ->modalHeading('Conectar reporte de Brandwatch')
-                            ->modalDescription('Adjunta el CSV exportado desde Brandwatch para sincronizar menciones y sentimientos.')
-                            ->modalSubmitActionLabel('Subir reporte')
-                            ->form([
-                                Forms\Components\FileUpload::make('brandwatch_file')
-                                    ->label('Reporte Brandwatch')
-                                    ->acceptedFileTypes(['text/csv', 'text/plain'])
-                                    ->required()
-                                    ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
-                                    ->dehydrated(false)
-                                    ->preserveFilenames(),
-                            ])
-                            ->action(function (array $data): void {
-                                $uploaded = $data['brandwatch_file'] ?? null;
-
-                                if (! $uploaded) {
-                                    Notification::make()
-                                        ->title('No se detectó el reporte de Brandwatch')
-                                        ->body('Intenta nuevamente y verifica que el archivo exportado sea .csv.')
-                                        ->danger()
-                                        ->send();
-
-                                    return;
-                                }
-
-                                $fileName = is_string($uploaded)
-                                    ? basename($uploaded)
-                                    : $uploaded->getClientOriginalName();
-
-                                Notification::make()
-                                    ->title('Reporte Brandwatch recibido')
-                                    ->body('El archivo “'.$fileName.'” ya está disponible para revisión.')
-                                    ->success()
-                                    ->send();
-                            }),
-                    ])
-                        ->columnSpanFull()
-                        ->extraAttributes([
-                            'class' => 'flex flex-col items-center justify-center gap-3 py-6',
-                        ]),
-                ])
-                ->columns(12)
-                ->extraAttributes([
-                    'class' => 'space-y-4 rounded-3xl border border-blue-500/30 bg-white/80 p-6 shadow-xl ring-1 ring-blue-500/20 backdrop-blur-sm dark:border-blue-500/20 dark:bg-gray-900/70',
-                ]),
         ];
+    }
+
+    protected static function storeCsvUpload($uploaded, ?int $formDefinitionId, ?int $projectId): ?ProjectCsvUpload
+    {
+        $storedFile = static::persistUploadedFile($uploaded);
+
+        if (! $storedFile) {
+            return null;
+        }
+
+        [$path, $originalName, $disk] = $storedFile;
+
+        return ProjectCsvUpload::create([
+            'project_id' => $projectId,
+            'form_definition_id' => $formDefinitionId,
+            'storage_disk' => $disk,
+            'file_path' => $path,
+            'original_name' => $originalName,
+            'status' => ProjectCsvUpload::STATUS_PENDING,
+        ]);
+    }
+
+    protected static function persistUploadedFile($uploaded): ?array
+    {
+        $disk = config('filesystems.default', 'local');
+
+        if ($uploaded instanceof TemporaryUploadedFile) {
+            $extension = $uploaded->getClientOriginalExtension();
+            $filename = Str::uuid().($extension ? '.'.$extension : '');
+            $path = $uploaded->storeAs('project-imports/csv', $filename, $disk);
+
+            if (! $path) {
+                return null;
+            }
+
+            return [$path, $uploaded->getClientOriginalName(), $disk];
+        }
+
+        if (is_string($uploaded)) {
+            if (! Storage::disk($disk)->exists($uploaded)) {
+                return null;
+            }
+
+            return [$uploaded, basename($uploaded), $disk];
+        }
+
+        return null;
     }
 
     public static function sanitizeFormDefinitionData(array $data): array
