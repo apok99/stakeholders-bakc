@@ -8,6 +8,7 @@ use App\Models\Project;
 use Filament\Forms;
 use Filament\Forms\Components\Actions as FormActions;
 use Filament\Forms\Components\Actions\Action as FormAction;
+use Filament\Notifications\Notification;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -317,11 +318,110 @@ class ProjectResource extends Resource
 
                         $set('form_responses', $responses);
                     }),
+                FormAction::make('uploadCsv')
+                    ->label('Subir CSV')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('secondary')
+                    ->modalIcon('heroicon-o-arrow-up-tray')
+                    ->modalHeading('Importar respuestas desde CSV')
+                    ->modalDescription('Carga un archivo CSV con las respuestas para esta categoría.')
+                    ->modalSubmitActionLabel('Subir archivo')
+                    ->form([
+                        Forms\Components\FileUpload::make('csv_file')
+                            ->label('Archivo CSV')
+                            ->acceptedFileTypes(['text/csv', 'text/plain', 'application/vnd.ms-excel'])
+                            ->required()
+                            ->helperText('Selecciona un archivo .csv con los datos de stakeholders o respuestas preparadas.')
+                            ->dehydrated(false)
+                            ->preserveFilenames(),
+                    ])
+                    ->action(function (array $data): void {
+                        $uploaded = $data['csv_file'] ?? null;
+
+                        if (! $uploaded) {
+                            Notification::make()
+                                ->title('No se detectó el archivo CSV')
+                                ->body('Intenta nuevamente y asegúrate de adjuntar un archivo .csv válido.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $fileName = is_string($uploaded)
+                            ? basename($uploaded)
+                            : $uploaded->getClientOriginalName();
+
+                        Notification::make()
+                            ->title('CSV cargado correctamente')
+                            ->body('El archivo “'.$fileName.'” quedó listo para procesarse.')
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn (callable $get) => filled($get('form_definition_id'))),
+                FormAction::make('uploadBrandwatch')
+                    ->label('Subir Brandwatch')
+                    ->icon('heroicon-o-cloud-arrow-up')
+                    ->color('info')
+                    ->modalIcon('heroicon-o-cloud-arrow-up')
+                    ->modalHeading('Conectar reporte de Brandwatch')
+                    ->modalDescription('Adjunta el CSV exportado desde Brandwatch para sincronizar menciones y sentimientos.')
+                    ->modalSubmitActionLabel('Subir reporte')
+                    ->form([
+                        Forms\Components\FileUpload::make('brandwatch_file')
+                            ->label('Reporte Brandwatch')
+                            ->acceptedFileTypes(['text/csv', 'text/plain'])
+                            ->required()
+                            ->helperText('Carga el archivo exportado desde Brandwatch en formato CSV.')
+                            ->dehydrated(false)
+                            ->preserveFilenames(),
+                    ])
+                    ->action(function (array $data): void {
+                        $uploaded = $data['brandwatch_file'] ?? null;
+
+                        if (! $uploaded) {
+                            Notification::make()
+                                ->title('No se detectó el reporte de Brandwatch')
+                                ->body('Intenta nuevamente y verifica que el archivo exportado sea .csv.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $fileName = is_string($uploaded)
+                            ? basename($uploaded)
+                            : $uploaded->getClientOriginalName();
+
+                        Notification::make()
+                            ->title('Reporte Brandwatch recibido')
+                            ->body('El archivo “'.$fileName.'” ya está disponible para revisión.')
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn (callable $get) => filled($get('form_definition_id'))),
+                FormAction::make('generateSampleData')
+                    ->label('Generar automáticamente')
+                    ->icon('heroicon-o-sparkles')
+                    ->color('warning')
+                    ->action(function ($livewire): void {
+                        if (method_exists($livewire, 'fillFakeData')) {
+                            $livewire->fillFakeData();
+
+                            Notification::make()
+                                ->title('Contenido generado')
+                                ->body('Hemos completado los campos principales con un ejemplo listo para editar.')
+                                ->success()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn (callable $get, $livewire) => $livewire instanceof Pages\CreateProject && filled($get('form_definition_id')))
+                    ->requiresConfirmation(false),
             ])
                 ->visible(fn (callable $get) => filled($get('form_definition_id')))
                 ->columnSpan(6)
                 ->extraAttributes([
-                    'class' => 'flex items-center justify-center gap-3 py-6',
+                    'class' => 'flex flex-col items-center justify-center gap-3 py-6',
                 ]),
             Forms\Components\ViewField::make('form_responses_preview')
                 ->label('Respuestas guardadas')

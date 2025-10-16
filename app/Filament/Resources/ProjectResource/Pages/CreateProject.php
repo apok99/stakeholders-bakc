@@ -22,7 +22,7 @@ class CreateProject extends CreateRecord
         ];
     }
 
-    protected function fillFakeData(): void
+    public function fillFakeData(): void
     {
         $faker = fake();
 
