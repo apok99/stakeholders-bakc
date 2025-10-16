@@ -4,7 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProjectResource\Pages;
 use App\Models\Project;
-use Filament\Forms;
+use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -22,7 +24,7 @@ class ProjectResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $fieldAccentClasses = 'focus:border-[#F54963] focus:ring-[#F54963]/80';
+        $fieldAccentClasses = 'focus:border-blue-500 focus:ring-blue-500/80';
 
         return $form
             ->schema([
@@ -36,6 +38,7 @@ class ProjectResource extends Resource
                             ->maxLength(255)
                             ->helperText('Resume la oportunidad o el reto que impulsa el proyecto.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->prefixIcon('heroicon-o-light-bulb')
                             ->columnSpan(6),
                         Forms\Components\TextInput::make('promoting_company')
                             ->label('Empresa impulsora')
@@ -44,6 +47,7 @@ class ProjectResource extends Resource
                             ->maxLength(255)
                             ->helperText('Quién lidera o financia la iniciativa.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->prefixIcon('heroicon-o-building-office-2')
                             ->columnSpan(6),
                         Forms\Components\TextInput::make('location')
                             ->label('Ubicación')
@@ -51,6 +55,7 @@ class ProjectResource extends Resource
                             ->required()
                             ->maxLength(255)
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->prefixIcon('heroicon-o-map-pin')
                             ->columnSpan(4),
                         Forms\Components\TextInput::make('current_phase')
                             ->label('Fase actual')
@@ -59,6 +64,7 @@ class ProjectResource extends Resource
                             ->maxLength(255)
                             ->helperText('Define el momento actual del proyecto para alinear expectativas.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->prefixIcon('heroicon-o-tag')
                             ->columnSpan(4),
                         Forms\Components\TextInput::make('main_objective')
                             ->label('Objetivo principal')
@@ -66,6 +72,7 @@ class ProjectResource extends Resource
                             ->required()
                             ->maxLength(255)
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
+                            ->prefixIcon('heroicon-o-rocket-launch')
                             ->columnSpan(4),
                         Forms\Components\Textarea::make('brief_project_description')
                             ->label('Descripción breve')
@@ -77,7 +84,7 @@ class ProjectResource extends Resource
                     ])
                     ->columns(12)
                     ->extraAttributes([
-                        'class' => 'space-y-6 rounded-3xl border border-[#F54963]/30 bg-white/80 p-6 shadow-xl ring-1 ring-[#F54963]/20 backdrop-blur-sm dark:bg-gray-900/80',
+                        'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-white/80 p-6 shadow-xl ring-1 ring-blue-500/20 backdrop-blur-sm dark:bg-gray-900/80',
                     ]),
                 Forms\Components\Section::make('Narrativa y próximos pasos')
                     ->description('Profundiza en sensibilidades, actores clave y los hitos que marcan el camino por recorrer.')
@@ -90,11 +97,10 @@ class ProjectResource extends Resource
                             ->helperText('Detalla riesgos o resistencias que puedan afectar la relación con actores clave.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
                             ->columnSpanFull(),
-                        Forms\Components\Textarea::make('known_initial_actors')
+                        Forms\Components\TagsInput::make('known_initial_actors')
                             ->label('Actores iniciales identificados')
                             ->placeholder('Gobernaciones, asociaciones locales, líderes comunitarios…')
                             ->required()
-                            ->autosize()
                             ->helperText('Separa los actores con comas para facilitar la lectura.')
                             ->extraInputAttributes(['class' => $fieldAccentClasses])
                             ->columnSpanFull(),
@@ -116,7 +122,7 @@ class ProjectResource extends Resource
                     ])
                     ->columns(12)
                     ->extraAttributes([
-                        'class' => 'space-y-6 rounded-3xl border border-[#F54963]/30 bg-[#F54963]/5 p-6 shadow-lg ring-1 ring-[#F54963]/25 backdrop-blur-sm',
+                        'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-lg ring-1 ring-blue-500/25 backdrop-blur-sm',
                     ]),
             ]);
     }
