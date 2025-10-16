@@ -3,8 +3,11 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProjectResource\Pages;
+use App\Models\FormDefinition;
 use App\Models\Project;
 use Filament\Forms;
+use Filament\Forms\Components\Actions as FormActions;
+use Filament\Forms\Components\Actions\Action as FormAction;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -122,6 +125,111 @@ class ProjectResource extends Resource
                     ->extraAttributes([
                         'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-lg ring-1 ring-blue-500/25 backdrop-blur-sm',
                     ]),
+                Forms\Components\Section::make('Formulario asociado al proyecto')
+                    ->description('Vincula un formulario predefinido para capturar respuestas clave sin salir de esta pantalla.')
+                    ->schema([
+                        Forms\Components\Grid::make(12)
+                            ->schema([
+                                Forms\Components\Select::make('form_definition_id')
+                                    ->label('Tipo de formulario')
+                                    ->options(fn () => FormDefinition::query()->pluck('name', 'id'))
+                                    ->searchable()
+                                    ->placeholder('Selecciona un formulario')
+                                    ->reactive()
+                                    ->afterStateUpdated(fn ($state, callable $set) => $set('form_responses', []))
+                                    ->helperText('Los formularios se gestionan desde la pestaña “Form Definitions”.')
+                                    ->columnSpan(6),
+                                Forms\Components\Hidden::make('form_responses')
+                                    ->default([])
+                                    ->dehydrated()
+                                    ->afterStateHydrated(fn (Forms\Components\Hidden $component, $state) => $component->state($state ?? [])),
+                                FormActions::make([
+                                    FormAction::make('fillFormDefinition')
+                                        ->label('Responder formulario ahora')
+                                        ->icon('heroicon-o-pencil-square')
+                                        ->modalHeading(fn (callable $get) => optional(FormDefinition::find($get('form_definition_id')))->name ?? 'Responder formulario')
+                                        ->modalSubmitActionLabel('Guardar respuestas')
+                                        ->modalWidth('lg')
+                                        ->visible(fn (callable $get) => filled($get('form_definition_id')))
+                                        ->form(function (callable $get): array {
+                                            $formDefinition = FormDefinition::find($get('form_definition_id'));
+
+                                            if (! $formDefinition) {
+                                                return [];
+                                            }
+
+                                            return collect($formDefinition->fields ?? [])
+                                                ->map(function ($field, $index) {
+                                                    $component = match ($field['type'] ?? 'text') {
+                                                        'select' => Forms\Components\Select::make("responses.{$index}")
+                                                            ->options(collect($field['options'] ?? [])->mapWithKeys(fn ($option) => [$option => $option])->all()),
+                                                        'checkbox' => Forms\Components\Checkbox::make("responses.{$index}"),
+                                                        'radio' => Forms\Components\Radio::make("responses.{$index}")
+                                                            ->options(collect($field['options'] ?? [])->mapWithKeys(fn ($option) => [$option => $option])->all()),
+                                                        'textarea' => Forms\Components\Textarea::make("responses.{$index}"),
+                                                        default => Forms\Components\TextInput::make("responses.{$index}"),
+                                                    };
+
+                                                    return $component
+                                                        ->label($field['label'] ?? 'Pregunta '.($index + 1))
+                                                        ->columnSpanFull();
+                                                })
+                                                ->values()
+                                                ->all();
+                                        })
+                                        ->fillForm(function (callable $get): array {
+                                            $responses = collect($get('form_responses') ?? []);
+
+                                            if ($responses->isEmpty()) {
+                                                return [];
+                                            }
+
+                                            return [
+                                                'responses' => $responses->pluck('answer')->toArray(),
+                                            ];
+                                        })
+                                        ->action(function (array $data, callable $set, callable $get): void {
+                                            $formDefinition = FormDefinition::find($get('form_definition_id'));
+
+                                            if (! $formDefinition) {
+                                                return;
+                                            }
+
+                                            $responses = collect($formDefinition->fields ?? [])
+                                                ->map(function ($field, $index) use ($data) {
+                                                    $answers = $data['responses'] ?? [];
+
+                                                    return [
+                                                        'question' => $field['label'] ?? 'Pregunta '.($index + 1),
+                                                        'answer' => $answers[$index] ?? null,
+                                                    ];
+                                                })
+                                                ->toArray();
+
+                                            $set('form_responses', $responses);
+                                        }),
+                                ])
+                                    ->visible(fn (callable $get) => filled($get('form_definition_id')))
+                                    ->columnSpan(6),
+                            ]),
+                        Forms\Components\ViewField::make('form_responses_preview')
+                            ->label('Respuestas guardadas')
+                            ->view('filament.forms.components.form-responses-preview')
+                            ->visible(fn (callable $get) => filled($get('form_responses')))
+                            ->viewData(function (callable $get): array {
+                                $formDefinition = FormDefinition::find($get('form_definition_id'));
+
+                                return [
+                                    'formName' => $formDefinition?->name,
+                                    'responses' => $get('form_responses') ?? [],
+                                ];
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(12)
+                    ->extraAttributes([
+                        'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-white/70 p-6 shadow-lg ring-1 ring-blue-500/20 backdrop-blur-sm dark:bg-gray-900/80',
+                    ]),
             ]);
     }
 
@@ -146,6 +254,9 @@ class ProjectResource extends Resource
                 Tables\Columns\TextColumn::make('main_objective')
                     ->label('Main Objective')
                     ->limit(40)
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('formDefinition.name')
+                    ->label('Formulario asociado')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()

@@ -14,11 +14,9 @@ class CreateProject extends CreateRecord
     {
         return [
             Actions\Action::make('fillFakeData')
-                ->label('Rellenar con datos de prueba')
-                ->color('gray')
-                ->extraAttributes([
-                    'class' => 'border border-[#F54963] bg-[#F54963] text-white transition hover:bg-[#F54963]/90 focus:ring-[#F54963]/40',
-                ])
+                ->label('Generar automáticamente')
+                ->icon('heroicon-o-sparkles')
+                ->color('danger')
                 ->action(fn () => $this->fillFakeData()),
             ...parent::getFormActions(),
         ];
