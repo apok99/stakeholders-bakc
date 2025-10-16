@@ -41,4 +41,11 @@ class CreateProject extends CreateRecord
                 ->implode(PHP_EOL),
         ]);
     }
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data = parent::mutateFormDataBeforeCreate($data);
+
+        return ProjectResource::sanitizeFormDefinitionData($data);
+    }
 }

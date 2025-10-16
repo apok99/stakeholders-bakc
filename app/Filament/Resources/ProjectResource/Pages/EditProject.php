@@ -16,4 +16,11 @@ class EditProject extends EditRecord
             Actions\DeleteAction::make(),
         ];
     }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $data = parent::mutateFormDataBeforeSave($data);
+
+        return ProjectResource::sanitizeFormDefinitionData($data);
+    }
 }
