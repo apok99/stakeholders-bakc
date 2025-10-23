@@ -165,6 +165,27 @@ class ProjectResource extends Resource
                     ->extraAttributes([
                         'class' => 'space-y-6 rounded-3xl border border-blue-500/30 bg-blue-500/5 p-6 shadow-lg ring-1 ring-blue-500/25 backdrop-blur-sm',
                     ]),
+                Forms\Components\Section::make('Archivos Generados')
+                    ->description('Descarga los análisis de stakeholders generados por la IA.')
+                    ->schema([
+                        Forms\Components\Placeholder::make('generated_files')
+                            ->label('Archivos')
+                            ->content(function ($livewire) {
+                                $project = $livewire->getRecord();
+                                if (!$project || !$project->csvUploads()->exists()) {
+                                    return 'No hay archivos generados todavía.';
+                                }
+
+                                $list = '<ul>';
+                                foreach ($project->csvUploads as $upload) {
+                                    $list .= '<li>' . $upload->original_name . ' (' . $upload->created_at->format('d/m/Y H:i') . ') - <button wire:click="downloadCsv(' . $upload->id . ')" class="text-blue-500 hover:underline">Descargar</button></li>';
+                                }
+                                $list .= '</ul>';
+
+                                return new \Illuminate\Support\HtmlString($list);
+                            }),
+                    ])
+                    ->visible(fn ($livewire) => $livewire->getRecord()->exists),
                 Forms\Components\Section::make('Brandwatch')
                     ->description('Sincroniza insights de escucha social importando reportes directamente desde Brandwatch.')
                     ->schema([
