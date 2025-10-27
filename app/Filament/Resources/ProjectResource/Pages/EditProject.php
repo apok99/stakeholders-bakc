@@ -83,7 +83,7 @@ class EditProject extends EditRecord
                         $prompt = $this->buildGptPrompt($project);
 
                         $response = \OpenAI\Laravel\Facades\OpenAI::chat()->create([
-                            'model' => 'gpt-4o',
+                            'model' => 'gpt-5',
                             'messages' => [
                                 ['role' => 'user', 'content' => $prompt],
                             ],
@@ -117,6 +117,9 @@ class EditProject extends EditRecord
                             ->body('Hemos recibido la respuesta de la IA y la estamos procesando. La lista de stakeholders se actualizará en breve.')
                             ->success()
                             ->send();
+
+                        // Download the generated CSV file
+                        return Storage::disk('private')->download($filePath, 'stakeholders-gpt-' . now()->format('Y-m-d') . '.csv');
 
                     } catch (\Exception $e) {
                         Log::error('Error communicating with OpenAI on edit page: ' . $e->getMessage());
